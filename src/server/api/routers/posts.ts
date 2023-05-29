@@ -1,6 +1,8 @@
 import clerkClient, { type User } from "@clerk/clerk-sdk-node";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
+import { Ratelimit } from "@upstash/ratelimit"; // for deno: see above
+import { Redis } from "@upstash/redis";
 
 import {
   createTRPCRouter,
@@ -15,6 +17,13 @@ const filterUserForClient = (user: User) => {
     profileImageUrl: user.profileImageUrl,
   };
 };
+
+const ratelimit = new Ratelimit({
+  redis: Redis.fromEnv(),
+  limiter: Ratelimit.slidingWindow(3, "1 m"),
+  analytics: true,
+  prefix: "@upstash/ratelimit",
+});
 
 export const postsRouter = createTRPCRouter({
   getAll: publicProcedure.query(async ({ ctx }) => {
@@ -55,6 +64,9 @@ export const postsRouter = createTRPCRouter({
     .input(z.object({ content: z.string().emoji().min(1).max(280) }))
     .mutation(async ({ ctx, input }) => {
       const authorId = ctx.userId;
+
+      const { success } = await ratelimit.limit(authorId);
+      if (!success) throw new TRPCError({ code: "TOO_MANY_REQUESTS" });
 
       const post = await ctx.prisma.post.create({
         data: {
