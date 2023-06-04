@@ -24,7 +24,7 @@ export const PostView = (props: postWithUser) => {
 
           <span>{dayjs(post.createdAt).fromNow()}</span>
         </div>
-        <Link href={`/post/${post.authorId}`}>
+        <Link href={`/post/${post.id}`}>
           <span className="text-2xl">{post.content}</span>
         </Link>
       </div>
